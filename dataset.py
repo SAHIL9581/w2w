@@ -2,7 +2,6 @@
 
 # --- 1. Install Required Libraries ---
 print("--> Installing libraries for inference...")
-!pip install wandb torch lasio scikit-learn pandas matplotlib joblib pyyaml -q
 print("✅ Installation complete.")
 
 # --- 2. Create Temporary Workspace ---
@@ -13,7 +12,6 @@ os.chdir("/content/inference_data")
 print(f"✅ Workspace created at {os.getcwd()}")
 
 #@title 5. Upload Full LAS Dataset (ZIP file)
-from google.colab import files
 import os
 import pandas as pd
 import lasio
@@ -124,3 +122,4 @@ with wandb.init(project=WANDB_PROJECT, entity=WANDB_ENTITY, job_type='inference-
         print("✅ All plots logged successfully.")
     else:
         print("\n--> No plots were generated to log.")
+print("hi")

@@ -1,0 +1,6 @@
+lasio
+scikit-learn
+pandas
+matplotlib
+joblib
+torch==2.3.0+cpu
