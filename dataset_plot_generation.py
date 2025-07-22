@@ -108,11 +108,7 @@ if __name__ == '__main__':
 # ]
 # # -----------------------------------------------------------------
 
-# print("--- Initializing Inference Run ---")
-# # 1. Dynamically get the number of input features from the saved scaler
-# scaler = load(config['paths']['std_scaler_path'])
-# config['finetuning']['model_params']['in_channels'] = scaler.n_features_in_
-# print(f"Loaded scaler with {scaler.n_features_in_} features.")
+
 
 # # 2. Load the trained model
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
