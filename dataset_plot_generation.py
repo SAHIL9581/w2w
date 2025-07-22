@@ -1,140 +1,133 @@
-#@title 5. Upload Full LAS Dataset (ZIP file)
 import os
 import pandas as pd
 import lasio
-from joblib import load
 import json
-import torch
 import argparse
 import sys
-import os
-import glob
-import zipfile
-import json
-
-import pandas as pd
 import matplotlib.pyplot as plt
 
+def process_las_folder(source_dir, output_csv):
+    """
+    Reads all .las files from a source directory, processes them into a single
+    DataFrame, and saves it as a CSV file.
+    """
+    if not os.path.isdir(source_dir):
+        print(f"❌ Error: Source folder not found at '{source_dir}'", file=sys.stderr)
+        return False
 
-try:
-    import mlflow
-    HAS_MLFLOW = True
-except ImportError:
-    HAS_MLFLOW = False
+    print(f"--> Searching for .las files in '{source_dir}'...")
+    las_files_found = [os.path.join(root, file) for root, _, files in os.walk(source_dir) for file in files if file.lower().endswith('.las')]
+    
+    if not las_files_found:
+        print(f"❌ Error: No .las files found in '{source_dir}'", file=sys.stderr)
+        return False
+
+    print(f"--> Processing {len(las_files_found)} LAS files...")
+    all_wells_df = []
+    for filepath in las_files_found:
+        try:
+            las = lasio.read(filepath)
+            df = las.df().reset_index()
+            # Ensure WELL name is read as a string to prevent type errors later
+            well_name = getattr(las.well, 'WELL', os.path.splitext(os.path.basename(filepath))[0])
+            df['WELL'] = str(well_name)
+            
+            df['GROUP'] = 'UNKNOWN'
+            for param in las.params:
+                if 'GROUP' in param.mnemonic.upper():
+                    df['GROUP'] = str(param.value)
+            all_wells_df.append(df)
+        except Exception as e:
+            print(f"    - ⚠️  Could not read {filepath}: {e}")
+
+    master_df = pd.concat(all_wells_df, ignore_index=True)
+    if 'DEPT' in master_df.columns:
+        master_df.rename(columns={'DEPT': 'DEPTH_MD'}, inplace=True)
+    
+    # Ensure the output directory exists
+    os.makedirs(os.path.dirname(output_csv), exist_ok=True)
+    master_df.to_csv(output_csv, index=False, sep=';')
+    print(f"✅ Successfully created master dataset at '{output_csv}'")
+    return True
 
 def plot_well_pair(df, w1, w2, out_dir):
     df1 = df[df['WELL'] == w1]
     df2 = df[df['WELL'] == w2]
     if df1.empty or df2.empty:
-        print(f"⚠️  Skipping plot for '{w1}' vs '{w2}' (no data)")
+        print(f"⚠️  Skipping plot for '{w1}' vs '{w2}' (one or both wells not found)")
         return
 
     os.makedirs(out_dir, exist_ok=True)
     fig, ax = plt.subplots(figsize=(4, 6), dpi=150)
-    ax.plot(df1['GR'], df1['DEPTH_MD'], label=w1)
-    ax.plot(df2['GR'], df2['DEPTH_MD'], label=w2)
-    ax.invert_yaxis()
-    ax.set_xlabel('Gamma Ray')
-    ax.set_ylabel('Depth (MD)')
-    ax.set_title(f"{w1} vs {w2}")
-    ax.legend()
+    
+    if 'GR' in df1.columns and 'GR' in df2.columns:
+        ax.plot(df1['GR'], df1['DEPTH_MD'], label=w1, color='blue')
+        ax.plot(df2['GR'], df2['DEPTH_MD'], label=w2, color='red')
+        ax.set_xlabel('Gamma Ray (GR)')
+    else:
+        ax.text(0.5, 0.5, 'GR curve not available\nfor one or both wells.', ha='center', va='center')
 
-    fname = f"{w1.replace('/', '_')}_vs_{w2.replace('/', '_')}.png"
+    ax.invert_yaxis()
+    ax.set_ylabel('Depth (MD)')
+    ax.set_title(f"Well Correlation")
+    ax.legend()
+    ax.grid(True, which='both', linestyle='--', linewidth=0.5)
+
+    fname = f"Plot_{w1.replace('/', '_')}_vs_{w2.replace('/', '_')}.png"
     out_path = os.path.join(out_dir, fname)
     fig.savefig(out_path, bbox_inches='tight')
     plt.close(fig)
     print(f"✅ Saved plot: {out_path}")
 
-    if HAS_MLFLOW:
-        mlflow.log_artifact(out_path)
-
-
 def main():
-    # — your existing argparse + config loading + LAS→CSV logic here —
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-c','--config', default='config.json')
+    parser = argparse.ArgumentParser(description="Process a folder of LAS files and generate correlation plots.")
+    parser.add_argument('--config', default='config.json', help="Path to the JSON configuration file.")
     args = parser.parse_args()
 
     if not os.path.isfile(args.config):
-        print(f"[ERROR] Config '{args.config}' not found.", file=sys.stderr)
+        print(f"❌ Error: Config file '{args.config}' not found.", file=sys.stderr)
         sys.exit(1)
 
-    config = json.load(open(args.config))
-    zip_folder    = config['paths']['zip_folder']
-    raw_las_dir   = config['paths'].get('raw_las_dir','raw_las')
-    processed_csv = config['paths']['processed_csv_path']
+    with open(args.config) as f:
+        config = json.load(f)
 
-    # … unpack and process LAS exactly as before …
-    # at the end you write out processed_csv
+    # --- 1. Process Data ---
+    # Read paths from the new config structure
+    source_folder = config['paths']['zip_folder'] # This is now a folder, not a zip
+    csv_path = config['paths']['processed_csv_path']
+    
+    if not os.path.exists(csv_path):
+        print(f"Processed CSV not found at '{csv_path}'. Generating it from folder '{source_folder}'...")
+        success = process_las_folder(source_folder, csv_path)
+        if not success:
+            sys.exit(1)
+    else:
+        print(f"Using existing processed CSV: '{csv_path}'")
 
-    df = pd.read_csv(processed_csv, sep=';')
+    # --- 2. Generate Plots ---
+    df = pd.read_csv(csv_path, sep=';', low_memory=False)
 
-    # — now dynamically build your well‑pairs —
-    wells = sorted(df['WELL'].unique())
+    # **THE FIX IS HERE:** Ensure the 'WELL' column is treated as a string before sorting.
+    wells = sorted(df['WELL'].astype(str).unique())
+    
     if len(wells) < 2:
-        print("⚠️  Not enough wells to plot pairs.")
+        print("⚠️  Not enough unique wells found in the data to create pairs.")
         return
 
-    # e.g. sliding window pairs:
     well_pairs = [(wells[i], wells[i+1]) for i in range(len(wells)-1)]
 
-    plots_dir = config.get('inference', {}).get('plots_dir', 'plots')
-    print("\n--- Generating inference dashboard plots ---")
+    # Your new config doesn't specify a plot directory, so we'll create a default one.
+    plots_dir = 'inference_plots'
+    print(f"\n--- Generating {len(well_pairs)} well pair plots in folder '{plots_dir}' ---")
     for w1, w2 in well_pairs:
         plot_well_pair(df, w1, w2, plots_dir)
     print("--- Done 🚀 ---\n")
 
-    # finally list all wells
+    # --- 3. List available wells ---
     print("\n--- Available Well Names for Correlation ---")
     for w in wells:
         print(f"- {w}")
     print("------------------------------------------")
 
-
 if __name__ == '__main__':
     main()
-
-# #@title 8. 🚀 Inference Dashboard: Generate and Log Plots
-
-
-
-# # --- ACTION REQUIRED: Define the well pairs you want to plot ---
-# # Copy and paste valid well names from the output of Cell 5.
-# well_pairs_to_plot = [
-#     ("15_9-13 Sleipner East Appr", "16/1-2  Ivar Aasen Appr"),
-#     ("16/2-6 Johan Sverdrup", "16/5-3 Johan Sverdrup Appr"),
-#     ("35/11-1", "35/11-6"),
-#     # Add more pairs here...
-# ]
-# # -----------------------------------------------------------------
-
-
-
-# # 2. Load the trained model
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# model = W2WTransformerModel(config).to(device)
-# model.load_state_dict(torch.load(config['paths']['final_model_path'], map_location=device))
-# model.eval()
-# print(f"✅ Model '{config['paths']['final_model_path']}' loaded successfully onto {device}.")
-
-# # 3. Load the full dataset for lookups
-# full_data = pd.read_csv(config['paths']['processed_csv_path'], delimiter=';')
-# print(f"✅ Full dataset with {len(full_data.WELL.unique())} wells loaded.")
-
-# # 4. Generate plots and save locally
-# for i, (well1, well2) in enumerate(well_pairs_to_plot):
-#     print(f"\n--- Generating plot for: {well1} vs {well2} ---")
-#     # Create a filesystem-safe filename
-#     safe_well1 = well1.replace('/','-').replace(' ','_')
-#     safe_well2 = well2.replace('/','-').replace(' ','_')
-#     output_filename = f"correlation_{safe_well1}_vs_{safe_well2}.png"
-
-#     # NOTE: This still uses the MOCK inference logic.
-#     # To use the real model, you would pass data patches through `model(patches)`
-#     # and interpret the output to create the similarity matrix.
-#     success = generate_single_correlation_plot(config, full_data, well1, well2, output_filename)
-
-#     if success:
-#         print(f"Plot saved locally: {output_filename}")
-#     else:
-#         print(f"Failed to generate plot for: {well1} vs {well2}")
