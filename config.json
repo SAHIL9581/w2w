@@ -1,6 +1,6 @@
 {
   "paths": {
-    "zip_folder": "test",
+    "zip_folder": "test/las.zip",
     "raw_las_dir": "raw_las",
     "processed_csv_path": "data/processed_wells.csv",
     "std_scaler_path": "models/StandardScaler.bin",
