@@ -5,49 +5,67 @@ import json
 import argparse
 import sys
 import matplotlib.pyplot as plt
+import io
 
-def process_las_folder(source_dir, output_csv):
+import zipfile
+
+def process_las_folder(zip_path, output_csv):
     """
-    Reads all .las files from a source directory, processes them into a single
-    DataFrame, and saves it as a CSV file.
+    Reads all .las files from the given ZIP archive, concatenates them
+    into a single DataFrame, and writes it out as a semicolon CSV.
     """
-    if not os.path.isdir(source_dir):
-        print(f"❌ Error: Source folder not found at '{source_dir}'", file=sys.stderr)
+    if not os.path.isfile(zip_path) or not zipfile.is_zipfile(zip_path):
+        print(f"❌ Error: '{zip_path}' is not a valid ZIP file", file=sys.stderr)
         return False
 
-    print(f"--> Searching for .las files in '{source_dir}'...")
-    las_files_found = [os.path.join(root, file) for root, _, files in os.walk(source_dir) for file in files if file.lower().endswith('.las')]
-    
-    if not las_files_found:
-        print(f"❌ Error: No .las files found in '{source_dir}'", file=sys.stderr)
+    las_dfs = []
+    print(f"--> Extracting LAS files from ZIP '{zip_path}'…")
+
+    with zipfile.ZipFile(zip_path, 'r') as zf:
+        for entry in zf.namelist():
+            if not entry.lower().endswith('.las'):
+                continue
+
+            try:
+                # 1) read raw bytes, decode to text
+                raw_bytes = zf.read(entry)
+                text = raw_bytes.decode('utf-8', errors='replace')
+
+                # 2) wrap text in StringIO so lasio sees a file‐like text stream
+                sio = io.StringIO(text)
+                las = lasio.read(sio)
+
+                # 3) build DataFrame
+                df = las.df().reset_index()
+                if hasattr(las.well, 'WELL') and hasattr(las.well.WELL, 'value'):
+                    well_name = las.well.WELL.value
+                else:
+                    well_name = os.path.splitext(os.path.basename(entry))[0]
+                df['WELL'] = str(well_name)
+                df['GROUP'] = 'UNKNOWN'
+                for param in las.params:
+                    if 'GROUP' in param.mnemonic.upper():
+                        df['GROUP'] = str(param.value)
+
+                las_dfs.append(df)
+                print(f"    ↳ Parsed {entry}")
+
+            except Exception as e:
+                print(f"    – ⚠️  Could not parse {entry}: {e}", file=sys.stderr)
+
+    if not las_dfs:
+        print(f"❌ Error: No .las files successfully read from '{zip_path}'", file=sys.stderr)
         return False
 
-    print(f"--> Processing {len(las_files_found)} LAS files...")
-    all_wells_df = []
-    for filepath in las_files_found:
-        try:
-            las = lasio.read(filepath)
-            df = las.df().reset_index()
-            # Ensure WELL name is read as a string to prevent type errors later
-            well_name = getattr(las.well, 'WELL', os.path.splitext(os.path.basename(filepath))[0])
-            df['WELL'] = str(well_name)
-            
-            df['GROUP'] = 'UNKNOWN'
-            for param in las.params:
-                if 'GROUP' in param.mnemonic.upper():
-                    df['GROUP'] = str(param.value)
-            all_wells_df.append(df)
-        except Exception as e:
-            print(f"    - ⚠️  Could not read {filepath}: {e}")
-
-    master_df = pd.concat(all_wells_df, ignore_index=True)
+    # concatenate & rename
+    master_df = pd.concat(las_dfs, ignore_index=True)
     if 'DEPT' in master_df.columns:
         master_df.rename(columns={'DEPT': 'DEPTH_MD'}, inplace=True)
-    
-    # Ensure the output directory exists
+
+    # write CSV
     os.makedirs(os.path.dirname(output_csv), exist_ok=True)
     master_df.to_csv(output_csv, index=False, sep=';')
-    print(f"✅ Successfully created master dataset at '{output_csv}'")
+    print(f"✅ Master dataset written to '{output_csv}'")
     return True
 
 def plot_well_pair(df, w1, w2, out_dir):
@@ -80,8 +98,13 @@ def plot_well_pair(df, w1, w2, out_dir):
     print(f"✅ Saved plot: {out_path}")
 
 def main():
-    parser = argparse.ArgumentParser(description="Process a folder of LAS files and generate correlation plots.")
-    parser.add_argument('--config', default='config.json', help="Path to the JSON configuration file.")
+    parser = argparse.ArgumentParser(
+        description="Process a folder of LAS files and generate correlation plots."
+    )
+    parser.add_argument(
+        '--config', default='config.json',
+        help="Path to the JSON configuration file."
+    )
     args = parser.parse_args()
 
     if not os.path.isfile(args.config):
@@ -91,34 +114,26 @@ def main():
     with open(args.config) as f:
         config = json.load(f)
 
-    # --- 1. Process Data ---
-    # Read paths from the new config structure
-    source_folder = config['paths']['zip_folder'] # This is now a folder, not a zip
-    csv_path = config['paths']['processed_csv_path']
-    
-    if not os.path.exists(csv_path):
-        print(f"Processed CSV not found at '{csv_path}'. Generating it from folder '{source_folder}'...")
-        success = process_las_folder(source_folder, csv_path)
-        if not success:
-            sys.exit(1)
-    else:
-        print(f"Using existing processed CSV: '{csv_path}'")
+    # --- 1. Always regenerate the master CSV from LAS files ---
+    source_folder = config['paths']['zip_folder']
+    csv_path      = config['paths']['processed_csv_path']
 
-    # --- 2. Generate Plots ---
+    print(f"🔄 Generating master CSV at '{csv_path}' from LAS files in '{source_folder}'…")
+    success = process_las_folder(zip_path=source_folder, output_csv=csv_path)
+    if not success:
+        sys.exit(1)
+
+    # --- 2. Load the freshly‐generated CSV and make plots ---
     df = pd.read_csv(csv_path, sep=';', low_memory=False)
 
-    # **THE FIX IS HERE:** Ensure the 'WELL' column is treated as a string before sorting.
     wells = sorted(df['WELL'].astype(str).unique())
-    
     if len(wells) < 2:
-        print("⚠️  Not enough unique wells found in the data to create pairs.")
+        print("⚠️  Not enough unique wells to create correlation plots.")
         return
 
     well_pairs = [(wells[i], wells[i+1]) for i in range(len(wells)-1)]
-
-    # Your new config doesn't specify a plot directory, so we'll create a default one.
-    plots_dir = 'inference_plots'
-    print(f"\n--- Generating {len(well_pairs)} well pair plots in folder '{plots_dir}' ---")
+    plots_dir  = 'inference_plots'
+    print(f"\n--- Generating {len(well_pairs)} well‐pair plots into '{plots_dir}' ---")
     for w1, w2 in well_pairs:
         plot_well_pair(df, w1, w2, plots_dir)
     print("--- Done 🚀 ---\n")
