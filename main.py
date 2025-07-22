@@ -1,26 +1,75 @@
+# main.py
+"""
+Inference script for the W2W model pipeline using a JSON config file.
+Usage:
+    python main.py --config path/to/config.json
+"""
+import argparse
+import json
+import torch
+from torch.utils.data import DataLoader
 
-from model import get_activation  # Assuming you define or use models here
-from dataset import *             # Import your data preparation functions
-from inference import *           # Import inference functions
-from plotting import *            # Import plotting utilities
+# adjust imports to your project structure
+from datasets.W2W import W2WDataset
+from utils.utils import collate_fn
+from models.W2WModel import build_model
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='W2W Inference with JSON config')
+    parser.add_argument('--config', '-c', type=str, required=True,
+                        help='Path to JSON config file')
+    return parser.parse_args()
+
+
+def load_config(path: str) -> dict:
+    """Load JSON config into a dict."""
+    with open(path, 'r') as f:
+        return json.load(f)
+
 
 def main():
-    print("🚀 Starting Inference Pipeline...")
+    args = parse_args()
+    config = load_config(args.config)
 
-    # Example usage placeholders (update with actual function names):
-    # 1. Load data
-    # data = load_dataset("path/to/las.zip")
+    # Determine device
+    device = config['inference'].get('device') or ('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # 2. Load model
-    # model = load_model("path/to/model.pt")
+    # Prepare dataset and DataLoader
+    dataset = W2WDataset(
+        zip_folder=config['paths']['zip_folder'],
+        raw_las_dir=config['paths']['raw_las_dir'],
+        csv_file=config['paths']['processed_csv_path'],
+        std_scaler_bin_path=config['paths']['std_scaler_path']
+    )
+    loader = DataLoader(
+        dataset,
+        batch_size=config['inference'].get('batch_size', 8),
+        collate_fn=collate_fn,
+        shuffle=False
+    )
 
-    # 3. Run inference
-    # predictions = run_inference(model, data)
+    # Build model and load checkpoint
+    model = build_model(config)
+    ckpt_path = config['paths']['resume']
+    checkpoint = torch.load(ckpt_path, map_location=device)
+    model.load_state_dict(checkpoint['state_dict'])
+    model.to(device)
+    model.eval()
 
-    # 4. Plot results
-    # plot_results(predictions)
+    # Run inference
+    outputs = []
+    with torch.no_grad():
+        for inputs, meta in loader:
+            inputs = inputs.to(device)
+            preds = model(inputs)
+            outputs.append(preds.cpu())
 
-    print("✅ Pipeline complete.")
+    # Save outputs
+    out_path = config['inference'].get('output_path', 'outputs.pt')
+    torch.save(outputs, out_path)
+    print(f"Inference complete. Saved to {out_path}")
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     main()
