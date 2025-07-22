@@ -37,8 +37,6 @@ def main():
 
     # Prepare dataset and DataLoader
     dataset = W2WDataset(
-        zip_folder=config['paths']['zip_folder'],
-        raw_las_dir=config['paths']['raw_las_dir'],
         csv_file=config['paths']['processed_csv_path'],
         std_scaler_bin_path=config['paths']['std_scaler_path']
     )
@@ -69,7 +67,6 @@ def main():
     out_path = config['inference'].get('output_path', 'outputs.pt')
     torch.save(outputs, out_path)
     print(f"Inference complete. Saved to {out_path}")
-
 
 if __name__ == '__main__':
     main()
