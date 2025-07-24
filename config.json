@@ -6,6 +6,12 @@
     "std_scaler_path": "models/StandardScaler.bin",
     "resume": "weights/final_model.pt"
   },
+  "patch":{
+  "csv": "data/processed_wells.csv",
+  "output_dir": "output/test",
+  "window_size": 700,
+  "stride": 20
+},
   "dataset": {
     "root": "test",
     "patch_height": 700,
@@ -15,5 +21,36 @@
     "batch_size": 2,
     "output_path": "outputs.pt",
     "device": null
-  }
+  },
+  "model_parameters":{
+    "lr": "tune.loguniform(1e-4, 1e-2)",
+    "weight_decay": "tune.loguniform(1e-4, 1e-2)",
+    "epochs": 200,
+    "lr_drop": 10,  
+    "batch_size": 128,
+    "clip_max_norm": 0.1,
+    "frozen_weights": "None",
+    "encoder_checkpoint": "tune.choice([None, 'pretraining_checkpoint/unet.pth'])",
+    "dropout": 0.2,
+    "num_heads": 8,
+    "hidden_dim": 256,
+    "num_queries": 5,
+    "output_size": 3,
+    "num_transformers": 6,
+    "expansion_factor": 4,
+    "set_cost_class": 5.0, 
+    "set_cost_bbox": 1.0, 
+    "bbox_loss_coef": 1.0, 
+    "ce_loss_coef": 5.0, 
+    "eos_coef": 0.3, 
+    "seed": 42,
+    "eval": false,
+    "in_channels": 1,
+    "patch_height": 700,
+    "lr_warmup": true,
+    "lr_warmup_epoch": 10, 
+    "lr_scheduler_type": "tune.choice(['step', 'cosine'])",
+    "act_name": "prelu",
+    "project_in_features": 2048
+}
 }
