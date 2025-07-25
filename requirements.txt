@@ -3,4 +3,9 @@ scikit-learn
 pandas
 matplotlib
 joblib
+<<<<<<< Updated upstream
 #torch==2.3.0+cpu
+=======
+#torch==2.3.0+cpu
+numpy
+>>>>>>> Stashed changes
