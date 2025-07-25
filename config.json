@@ -1,0 +1,19 @@
+{
+  "paths": {
+    "zip_folder": "test/las.zip",
+    "raw_las_dir": "raw_las",
+    "processed_csv_path": "data/processed_wells.csv",
+    "std_scaler_path": "models/StandardScaler.bin",
+    "resume": "weights/final_model.pt"
+  },
+  "dataset": {
+    "root": "test",
+    "patch_height": 700,
+    "split": "train"
+  },
+  "inference": {
+    "batch_size": 2,
+    "output_path": "outputs.pt",
+    "device": null
+  }
+}
