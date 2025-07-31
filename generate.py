@@ -40,7 +40,6 @@ CLIENT_MAPPING = {
 }
 
 # --- DATA & MAPPING FUNCTIONS ---
-
 def map_las_headers(reference: list, unknown: list) -> dict:
     print("\n--- Mapping LAS Headers to Standard ---")
     final_mapping = {}
@@ -52,7 +51,6 @@ def map_las_headers(reference: list, unknown: list) -> dict:
             print(f"  ✅ Mapped standard '{ref_header}' to found '{target_header}'")
         else:
             final_mapping[ref_header] = None
-            print(f"  ℹ️ Standard '{ref_header}' not found in this LAS file.")
     return final_mapping
 
 def load_and_combine_las_from_zip(zip_bytes):
@@ -168,6 +166,7 @@ def plot_well_log(df, well_name):
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     return fig
 
+# THIS FUNCTION IS MODIFIED
 def plot_elbow_method(X, title_name):
     print(f"\n--- Generating Elbow Method Plot for: {title_name} ---")
     ks = range(1, 10)
@@ -179,12 +178,14 @@ def plot_elbow_method(X, title_name):
     plt.plot(ks, inertias, '-o', color='b', markerfacecolor='red', markersize=8)
     plt.xlabel('Number of Clusters (k)', fontsize=14)
     plt.ylabel('Inertia (Sum of Squared Distances)', fontsize=14)
+    # DYNAMIC TITLE
     plt.title(f'Elbow Method for {title_name}', fontsize=16, fontweight='bold')
     plt.xticks(ks)
     plt.grid(True, linestyle='--', alpha=0.6)
     plt.tight_layout()
     return fig
 
+# THIS FUNCTION IS MODIFIED
 def plot_tsne_visualization(X, y_labels, title_name):
     print(f"\n--- Generating t-SNE Visualization for: {title_name} ---")
     perplexity = min(30, len(X) - 1) if len(X) > 1 else 1
@@ -194,6 +195,7 @@ def plot_tsne_visualization(X, y_labels, title_name):
     scatter = plt.scatter(tsne_features[:, 0], tsne_features[:, 1], c=y_labels, cmap='viridis', alpha=0.7)
     plt.xlabel('t-SNE Component 1', fontsize=14)
     plt.ylabel('t-SNE Component 2', fontsize=14)
+    # DYNAMIC TITLE
     plt.title(f't-SNE Visualization for {title_name}', fontsize=16, fontweight='bold')
     plt.grid(True, linestyle='--', alpha=0.6)
     if len(np.unique(y_labels)) > 0:
@@ -252,11 +254,8 @@ async def generate_plots(
                     kmeans = KMeans(n_clusters=7, random_state=42, n_init=10).fit(scaled_X)
                     labels_df = pd.DataFrame(kmeans.labels_, index=scaled_X.index, columns=['CLASSIFICATION'])
                     df_with_classification = df_standardized.join(labels_df)
-                    
-                    # --- THIS IS THE FIX ---
                     df_with_classification['CLASSIFICATION'].ffill(inplace=True)
                     df_with_classification['CLASSIFICATION'].bfill(inplace=True)
-
                     fig = plot_well_log(df_with_classification, scope_name)
                 else:
                     fig = plot_well_log(df_standardized, scope_name)
@@ -267,10 +266,12 @@ async def generate_plots(
                     print(f"Skipping ML plot for {scope_name} as features could not be prepared.")
                     continue
                 if plot_type == 'elbow':
+                    # PASS THE DYNAMIC TITLE
                     fig = plot_elbow_method(scaled_X, scope_name)
                     filename = f"elbow_method_{safe_scope_name}.png"
                 elif plot_type == 'tsne':
                     kmeans = KMeans(n_clusters=7, random_state=42, n_init=10).fit(scaled_X)
+                    # PASS THE DYNAMIC TITLE
                     fig = plot_tsne_visualization(scaled_X, kmeans.labels_, scope_name)
                     filename = f"tsne_by_kmeans_{safe_scope_name}.png"
 
