@@ -1,0 +1,51 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.so
+# Environments
+.env
+.venv/
+env/
+venv/
+ENV/
+# VS Code settings
+.vscode/
+# Data files
+*.csv
+*.tsv
+*.xlsx
+*.h5
+*.db
+*.sqlite
+*.log
+# Model files
+*.h5
+*.pt
+*.pth
+*.onnx
+*.joblib
+*.pkl
+# Images and media
+*.png
+*.jpg
+*.jpeg
+*.bmp
+*.tif
+*.tiff
+# System files
+.DS_Store
+Thumbs.db
+# GitHub-related
+.gitattributes
+# Output files
+output/
+build/
+dist/
+*.egg-info/
+final_model.pt
+label_encoder.json
+test/
+weights/
+data/
+plot/
+raw_las/
