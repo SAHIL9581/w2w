@@ -1,10 +1,18 @@
+# Docker and Git
+.dockerignore
+.git
+.gitignore
+Dockerfile*
+docker-compose.yml
+
+# Python virtual environment and cache
 venv/
+.venv/
 __pycache__/
-.git/
 *.pyc
 *.pyo
 *.pyd
-*.ipynb
-*.log
-well-images/
-plots/ 
+
+# IDE/Editor folders
+.vscode/
+.idea/

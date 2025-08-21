@@ -15,9 +15,32 @@ LOG_CONFIG = [
 
 LOG_PLOT_COLORS = ['red', 'black', 'blue']
 
+# --- UPDATED MAPPING BASED ON CLIENT REQUEST ---
+# This dictionary now defines the specific aliases for the new dataset.
+# The "smart mapping" will use this as a fallback if a direct match isn't found.
 CLIENT_MAPPING = {
-    "CALI": "None", "RSHA": "None", "RMED": "None", "RDEP": "RES", "RHOB": "None",
-    "GR": "None", "SGR": "SN18", "NPHI": "None", "PEF": "None", "DTC": "None",
-    "SP": "SP", "BS": "None", "ROP": "None", "DTS": "None", "DCAL": "None",
-    "DRHO": "None", "MUDWEIGHT": "None", "RMIC": "None", "ROPA": "None", "RXO": "IND"
+    # Specific mappings requested by the client
+    "RDEP": "RES",
+    "RMED": "SN18",
+    "RSHA": "IND",
+    "SP": "SP",
+
+    # All other standard curves set to None as requested,
+    # so they will only plot if a direct match is found (e.g., GR -> GR).
+    "GR": "None",
+    "SGR": "None",
+    "RXO": "None",
+    "RMIC": "None",
+    "DTC": "None",
+    "DTS": "None",
+    "RHOB": "None",
+    "DRHO": "None",
+    "NPHI": "None",
+    "PEF": "None",
+    "CALI": "None",
+    "BS": "None",
+    "DCAL": "None",
+    "ROP": "None",
+    "ROPA": "None",
+    "MUDWEIGHT": "None",
 }
