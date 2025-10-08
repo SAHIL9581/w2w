@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+pandas
+scikit-learn
+matplotlib
+lasio
+python-multipart
+httpx
+reportlab
+torch
+numpy
+Plotting
+joblib
+pydantic
+pathlib2

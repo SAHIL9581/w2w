@@ -1,0 +1,68 @@
+{
+  "paths": {
+    "raw_las_folder": "data/raw_las/",
+    "raw_labels_file": "data/train_label.csv",
+    "processed_csv": "train.csv",
+    "std_scaler_path": "scaler.bin",
+    "label_encoder_path": "data/processed/label_encoder.json",
+    "ae_checkpoint": "artifacts/ae_best.pt",
+    "det_checkpoint": "detector_final.pt",
+    "selected_logs": ["WELL","DEPTH_MD","CALI","RSHA","RMED","RDEP","RHOB","GR","SGR","NPHI","PEF","DTC","SP",
+"BS","ROP","DTS","DCAL","DRHO","MUDWEIGHT","RMIC","ROPA","RXO"],
+    "label_identifier": "LITHOLOGY"
+  },
+  "run": {
+    "autoencoder": true,
+    "detector": true,
+    "inference": true
+  },
+  "wandb": {
+    "project": "w2w-boundary-detection",
+    "entity": "your_wandb_entity"
+  },
+  "autoencoder": {
+    "epochs": 20,
+    "batch_size": 64,
+    "learning_rate": 0.001,
+    "patch_height": 128,
+    "unet_params": {
+      "num_layers": 4,
+      "features_start": 32
+    },
+    "num_workers": 1
+  },
+  "detector": {
+    "epochs": 100,
+    "batch_size": 1,
+    "learning_rate": 0.0002,
+    "num_workers": 1,
+    "num_classes": 12,
+    "cost_class": 1.0,
+    "cost_bbox": 5.0,
+    "cost_giou": 2.0,
+    "weight_dict": {
+      "loss_ce": 1.0,
+      "loss_bbox": 5.0,
+      "loss_giou": 2.0
+    },
+    "eos_coef": 0.1
+  },
+  "model_params": {
+    "num_queries": 50,
+    "d_model": 128,
+    "nheads": 8,
+    "num_encoder_layers": 3,
+    "num_decoder_layers": 3,
+    "dim_feedforward": 1024,
+    "dropout": 0.1,
+    "num_classes": 12,
+    "in_channels":20
+  },
+ 
+  "inference": {
+    "reference_well_name": "35_9-10 S",
+    "wells_of_interest": ["35_9-6 S", "35_11-6"],
+    "correlation_threshold": 0.5,
+    "output_plot": "results/well_correlation.png"
+  }
+}

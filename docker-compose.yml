@@ -1,15 +1,29 @@
-version: "3.9"
-
 services:
-  well-log-api:
+  clustering-api:
     build:
       context: .
-      dockerfile: Dockerfile.backend
-    container_name: well-log-api
+      dockerfile: Dockerfile.clustering
+    container_name: well-clustering-api
     ports:
-      - "8000:8000"
+      - "8000:8000"  # Host:Container
     volumes:
-      - .:/app
+      - ./backend:/app
+      - ./backend/uploaded_data:/app/uploaded_data
+      - ./backend/output:/app/output
     environment:
-      - PYTHONUNBUFFERED=1
+      - GEMINI_API_KEY=AIzaSyAsWsc7Di88srmb8-CGkYXWxqIQV6bYtT8
+    restart: unless-stopped
+
+  deeplearning-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.deeplearning
+    container_name: well-deeplearning-api
+    ports:
+      - "8002:8002"  # Host:Container (both same now)
+    volumes:
+      - ./backend:/app
+      - ./backend/las_uploaded_data:/app/las_uploaded_data
+      - ./backend/well_files:/app/well_files
+      - ./backend/results:/app/results
     restart: unless-stopped
